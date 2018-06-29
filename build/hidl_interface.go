@@ -273,35 +273,6 @@ func hidlInterfaceMutator(mctx android.LoadHookContext, i *hidlInterface) {
 			}),
 			Export_generated_headers: []string{name.headersName()},
 		}, &i.properties.VndkProperties)
-
-		// Note: this is a legacy target which was used to enable system/vendor
-		// split before BOARD_VNDK_VERSION was available. It might be useful
-		// to re-enable it while bringing up codebases.
-		if !proptools.Bool(i.properties.VndkProperties.Vndk.Enabled) {
-			mctx.CreateModule(android.ModuleFactoryAdaptor(cc.LibraryFactory), &ccProperties{
-				Name:              proptools.StringPtr(name.string() + "_vendor"),
-				Owner:             i.properties.Owner,
-				Vendor:            proptools.BoolPtr(true),
-				Defaults:          []string{"hidl-module-defaults"},
-				Generated_sources: []string{name.sourcesName()},
-				Generated_headers: []string{name.headersName()},
-				Shared_libs: concat(cppDependencies, []string{
-					"libhidlbase",
-					"libhidltransport",
-					"libhwbinder",
-					"liblog",
-					"libutils",
-					"libcutils",
-				}),
-				Export_shared_lib_headers: concat(cppDependencies, []string{
-					"libhidlbase",
-					"libhidltransport",
-					"libhwbinder",
-					"libutils",
-				}),
-				Export_generated_headers: []string{name.headersName()},
-			}, &i.properties.VndkProperties)
-		}
 	}
 
 	if shouldGenerateJava {
