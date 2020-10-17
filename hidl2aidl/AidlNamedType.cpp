@@ -45,7 +45,7 @@ static void emitEnumAidlDefinition(Formatter& out, const EnumType& enumType) {
     enumType.emitDocComment(out);
     out << "@VintfStability\n";
     out << "@Backing(type=\"" << AidlHelper::getAidlType(*scalar, enumType.fqName()) << "\")\n";
-    out << "enum " << enumType.fqName().name() << " ";
+    out << "enum " << AidlHelper::getAidlType(enumType, enumType.fqName()) << " ";
     out.block([&] {
         enumType.forEachValueFromRoot([&](const EnumValue* value) {
             value->emitDocComment(out);
@@ -68,7 +68,7 @@ static void emitCompoundTypeAidlDefinition(
     const ProcessedCompoundType& processedType = it->second;
 
     compoundType.emitDocComment(out);
-    out << "@VintfStability \n";
+    out << "@VintfStability\n";
     out << "parcelable " << AidlHelper::getAidlName(compoundType.fqName()) << " ";
     if (compoundType.style() == CompoundType::STYLE_STRUCT) {
         out.block([&] {
