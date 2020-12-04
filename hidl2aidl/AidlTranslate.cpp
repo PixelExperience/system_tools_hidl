@@ -30,6 +30,7 @@
 #include "ConstantExpression.h"
 #include "Coordinator.h"
 #include "EnumType.h"
+#include "Interface.h"
 #include "NamedType.h"
 #include "ScalarType.h"
 #include "Scope.h"
@@ -69,6 +70,27 @@ static const std::string aidlTypePackage(const NamedType& type, AidlBackend back
     return prefix +
            base::Join(base::Split(AidlHelper::getAidlPackage(type.fqName()), "."), separator) +
            separator + AidlHelper::getAidlType(type, type.fqName());
+}
+
+static void emitEnumStaticAssert(Formatter& out, const NamedType& namedType, AidlBackend backend) {
+    CHECK(namedType.isEnum());
+    const auto& enumType = static_cast<const EnumType&>(namedType);
+    enumType.forEachValueFromRoot([&](const EnumValue* value) {
+        out << "static_assert(" << aidlTypePackage(namedType, backend) << "::" << value->name()
+            << " == static_cast<" << aidlTypePackage(namedType, backend) << ">("
+            << namedType.fullName() << "::" << value->name() << "));\n";
+    });
+    out << "\n";
+}
+
+static void emitStaticAsserts(Formatter& out, const std::set<const NamedType*>& namedTypes,
+                              AidlBackend backend) {
+    CHECK(backend != AidlBackend::JAVA);
+    for (const auto& namedType : namedTypes) {
+        if (namedType->isEnum()) {
+            emitEnumStaticAssert(out, *namedType, backend);
+        }
+    }
 }
 
 static void namedTypeTranslation(Formatter& out, const std::set<const NamedType*>& namedTypes,
@@ -312,21 +334,22 @@ static const std::string getPackageFilePath(const NamedType* type) {
     return base::Join(base::Split(type->fqName().package(), "."), "/");
 }
 
-static bool typeComesFromInterface(const NamedType* type) {
+static std::optional<const Interface*> getParentInterface(const NamedType* type) {
     const Scope* parent = type->parent();
     while (parent != nullptr) {
-        if (parent->isInterface()) {
-            return true;
+        if (parent->definesInterfaces()) {
+            return parent->getInterface();
         }
         parent = parent->parent();
     }
-    return false;
+    return std::nullopt;
 }
 
 static const std::string hidlIncludeFile(const NamedType* type) {
-    if (typeComesFromInterface(type)) {
+    std::optional<const Interface*> parent = getParentInterface(type);
+    if (parent) {
         return "#include \"" + getPackageFilePath(type) + "/" + type->fqName().version() + "/" +
-               type->parent()->fqName().getInterfaceName() + ".h\"\n";
+               parent.value()->fqName().getInterfaceName() + ".h\"\n";
     } else {
         return "#include \"" + getPackageFilePath(type) + "/" + type->fqName().version() +
                "/types.h\"\n";
@@ -354,7 +377,7 @@ static void emitCppTranslateHeader(
     out << "#pragma once\n\n";
     for (const auto& type : namedTypes) {
         const auto& it = processedTypes.find(type);
-        if (it == processedTypes.end()) {
+        if (it == processedTypes.end() && !type->isEnum()) {
             continue;
         }
         includes.insert(aidlIncludeFile(type, backend));
@@ -388,6 +411,7 @@ static void emitTranslateSource(
         out << "#include \""
             << AidlHelper::translateHeaderFile((*namedTypes.begin())->fqName(), backend) + "\"\n\n";
         out << "namespace android::h2a {\n\n";
+        emitStaticAsserts(out, namedTypes, backend);
     }
     for (const auto& type : namedTypes) {
         const auto& it = processedTypes.find(type);
