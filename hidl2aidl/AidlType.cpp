@@ -87,6 +87,10 @@ std::string AidlHelper::getAidlType(const Type& type, const FQName& relativeTo) 
     } else if (type.isBitField()) {
         const BitFieldType& bitfield = static_cast<const BitFieldType&>(type);
         return getAidlType(*bitfield.getElementType(), relativeTo);
+    } else if (type.getJavaType() == "short") {
+        notes() << relativeTo.name()
+                << ": Consider replacing char with int if signed integer is desired\n";
+        return "char";
     } else {
         return type.getJavaType();
     }
